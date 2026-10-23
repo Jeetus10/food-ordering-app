@@ -19,14 +19,24 @@ cloudinary.config({
 });
 
 // 2. Firebase Admin Initialization
-const admin = require("firebase-admin");
 
 let serviceAccount;
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   // Render / Production environment
-  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-} else {
+  try {
+    let rawData = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
+    // Remove starting/ending quotes if added by mistake
+    if (rawData.startsWith('"') && rawData.endsWith('"')) {
+      rawData = rawData.slice(1, -1);
+    }
+    serviceAccount = JSON.parse(rawData);
+  } catch (err) {
+    console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:", err);
+    process.exit(1);
+  }
+}
+ else {
   // Local development
   serviceAccount = require("./serviceAccountKey.json");
 }
