@@ -47,18 +47,19 @@
 
   <script>
     const firebaseConfig = {
-  apiKey: "AIzaSyBaUDKwqUYPe0GkJv7BsUI8KcLdOIKBcvk",
-  authDomain: "food-ordering-app-943f7.firebaseapp.com",
-  projectId: "food-ordering-app-943f7",
-  storageBucket: "food-ordering-app-943f7.firebasestorage.app",
-  messagingSenderId: "334188908872",
-  appId: "1:334188908872:web:f02af2955264f7107d237d",
-  measurementId: "G-XHBWZNXGDB"
-};
+      apiKey: "AIzaSyBaUDKwqUYPe0GkJv7BsUI8KcLdOIKBcvk",
+      authDomain: "food-ordering-app-943f7.firebaseapp.com",
+      projectId: "food-ordering-app-943f7",
+      storageBucket: "food-ordering-app-943f7.firebasestorage.app",
+      messagingSenderId: "334188908872",
+      appId: "1:334188908872:web:f02af2955264f7107d237d",
+      measurementId: "G-XHBWZNXGDB"
+    };
+
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    const BACKEND_URL = "https://food-ordering-app-e7hm.onrender.com";// Production par Render URL dalein
+    const BACKEND_URL = "https://food-ordering-app-e7hm.onrender.com";
 
     let user = null;
     let cart = [];
@@ -67,12 +68,30 @@
       const provider = new firebase.auth.GoogleAuthProvider();
       auth.signInWithPopup(provider).then(res => {
         user = res.user;
-        document.getElementById('auth-section').innerHTML = `
-          <span class="font-medium mr-3">Hi, ${user.displayName.split(' ')[0]}</span>
-          <button onclick="auth.signOut()" class="bg-orange-800 text-xs text-white px-3 py-1 rounded">Logout</button>
-        `;
+        updateAuthUI();
         listenLiveOrders();
-      });
+      }).catch(err => console.error("Login error:", err));
+    }
+
+    function logoutUser() {
+      auth.signOut().then(() => {
+        user = null;
+        document.getElementById('auth-section').innerHTML = `
+          <button onclick="login()" class="bg-white text-orange-600 font-semibold px-4 py-2 rounded-lg shadow hover:bg-orange-50 transition">
+            Login with Google
+          </button>
+        `;
+        document.getElementById('live-orders').innerHTML = '<p class="text-sm text-gray-500">Login to track your orders.</p>';
+      }).catch(err => console.error("Logout error:", err));
+    }
+
+    function updateAuthUI() {
+      if (user) {
+        document.getElementById('auth-section').innerHTML = `
+          <span class="font-medium mr-3 text-white">Hi, ${user.displayName.split(' ')[0]}</span>
+          <button onclick="logoutUser()" class="bg-orange-800 text-xs text-white px-3 py-1 rounded hover:bg-orange-900 transition">Logout</button>
+        `;
+      }
     }
 
     db.collection('menu').onSnapshot(snapshot => {
@@ -100,10 +119,14 @@
       const container = document.getElementById('cart-items');
       let total = 0;
       container.innerHTML = '';
-      cart.forEach(item => {
-        total += item.price;
-        container.innerHTML += `<div class="flex justify-between"><span>${item.name}</span><span>₹${item.price}</span></div>`;
-      });
+      if (cart.length === 0) {
+        container.innerHTML = `<p class="italic">Cart is empty</p>`;
+      } else {
+        cart.forEach(item => {
+          total += item.price;
+          container.innerHTML += `<div class="flex justify-between"><span>${item.name}</span><span>₹${item.price}</span></div>`;
+        });
+      }
       document.getElementById('cart-total').innerText = total;
     }
 
@@ -111,35 +134,47 @@
       if (!user) return alert("Pehle login karein!");
       if (cart.length === 0) return alert("Cart khali hai!");
 
-      const res = await fetch(`${BACKEND_URL}/api/orders/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.uid,
-          items: cart,
-          totalAmount: cart.reduce((sum, item) => sum + item.price, 0),
-          deliveryAddress: "Jaipur, Rajasthan"
-        })
-      });
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/orders/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: user.uid,
+            items: cart,
+            totalAmount: cart.reduce((sum, item) => sum + item.price, 0),
+            deliveryAddress: "Jaipur, Rajasthan"
+          })
+        });
 
-      const data = await res.json();
-      if (data.success) {
-        alert("Order Successful! ID: " + data.orderId);
-        cart = [];
-        renderCart();
+        const data = await res.json();
+        if (data.success) {
+          alert("Order Successful! ID: " + data.orderId);
+          cart = [];
+          renderCart();
+        } else {
+          alert("Order failed: " + (data.message || "Unknown error"));
+        }
+      } catch (err) {
+        console.error("Order error:", err);
+        alert("Server error while placing order.");
       }
     }
 
     function listenLiveOrders() {
+      if (!user) return;
       db.collection('orders').where('userId', '==', user.uid).onSnapshot(snapshot => {
         const container = document.getElementById('live-orders');
         container.innerHTML = '';
+        if (snapshot.empty) {
+          container.innerHTML = `<p class="text-sm text-gray-500">No active orders found.</p>`;
+          return;
+        }
         snapshot.forEach(doc => {
           const order = doc.data();
           container.innerHTML += `
             <div class="p-3 bg-orange-50 rounded border border-orange-200">
               <div class="flex justify-between text-xs font-bold text-orange-800">
-                <span>Status: ${order.status}</span><span>₹${order.totalAmount}</span>
+                <span>Status: ${order.status || 'Pending'}</span><span>₹${order.totalAmount}</span>
               </div>
             </div>
           `;
