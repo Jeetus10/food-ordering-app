@@ -47,17 +47,18 @@
 
   <script>
     const firebaseConfig = {
-      apiKey: "YOUR_FIREBASE_API_KEY",
-      authDomain: "YOUR_PROJECT.firebaseapp.com",
-      projectId: "YOUR_PROJECT_ID",
-      storageBucket: "YOUR_PROJECT.appspot.com",
-      messagingSenderId: "SENDER_ID",
-      appId: "APP_ID"
-    };
+  apiKey: "AIzaSyBaUDKwqUYPe0GkJv7BsUI8KcLdOIKBcvk",
+  authDomain: "food-ordering-app-943f7.firebaseapp.com",
+  projectId: "food-ordering-app-943f7",
+  storageBucket: "food-ordering-app-943f7.firebasestorage.app",
+  messagingSenderId: "334188908872",
+  appId: "1:334188908872:web:f02af2955264f7107d237d",
+  measurementId: "G-XHBWZNXGDB"
+};
     firebase.initializeApp(firebaseConfig);
     const auth = firebase.auth();
     const db = firebase.firestore();
-    const BACKEND_URL = "http://localhost:5000"; // Production par Render URL dalein
+    const BACKEND_URL = "https://food-ordering-app-e7hm.onrender.com";// Production par Render URL dalein
 
     let user = null;
     let cart = [];
