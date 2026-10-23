@@ -3,7 +3,6 @@ const cors = require('cors');
 const cloudinary = require('cloudinary').v2;
 const admin = require('firebase-admin');
 const dotenv = require('dotenv');
-const serviceAccount = require('./serviceAccountKey.json');
 
 dotenv.config();
 const app = express();
@@ -19,14 +18,12 @@ cloudinary.config({
 });
 
 // 2. Firebase Admin Initialization
-
 let serviceAccount;
 
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   // Render / Production environment
   try {
     let rawData = process.env.FIREBASE_SERVICE_ACCOUNT.trim();
-    // Remove starting/ending quotes if added by mistake
     if (rawData.startsWith('"') && rawData.endsWith('"')) {
       rawData = rawData.slice(1, -1);
     }
@@ -35,15 +32,17 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     console.error("Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:", err);
     process.exit(1);
   }
-}
- else {
+} else {
   // Local development
   serviceAccount = require("./serviceAccountKey.json");
 }
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
-});;
+});
+
+// Initialize Firestore database instance
+const db = admin.firestore();
 
 // --- API Endpoints ---
 
@@ -62,7 +61,7 @@ app.post('/api/admin/add-dish', async (req, res) => {
     }
 
     // Upload image to Cloudinary
-    const uploadResult = window.cloudinary ? null : await cloudinary.uploader.upload(imageBase64, {
+    const uploadResult = await cloudinary.uploader.upload(imageBase64, {
       folder: "food_app_dishes"
     });
 
