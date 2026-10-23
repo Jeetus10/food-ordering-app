@@ -19,10 +19,21 @@ cloudinary.config({
 });
 
 // 2. Firebase Admin Initialization
+const admin = require("firebase-admin");
+
+let serviceAccount;
+
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // Render / Production environment
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+} else {
+  // Local development
+  serviceAccount = require("./serviceAccountKey.json");
+}
+
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
-});
-const db = admin.firestore();
+});;
 
 // --- API Endpoints ---
 
