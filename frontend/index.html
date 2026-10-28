@@ -281,15 +281,39 @@
         }
         snapshot.forEach(doc => {
           const order = doc.data();
+          const orderId = doc.id;
+          const status = order.status || 'Pending';
+
+          let cancelBtn = '';
+          if (status === 'Pending') {
+            cancelBtn = `<button onclick="cancelOrder('${orderId}')" class="mt-2 bg-red-600 text-white text-xs px-2 py-1 rounded hover:bg-red-700 transition">Cancel Order</button>`;
+          }
+
           container.innerHTML += `
             <div class="p-3 bg-orange-50 rounded border border-orange-200">
               <div class="flex justify-between text-xs font-bold text-orange-800">
-                <span>Status: ${order.status || 'Pending'}</span><span>₹${order.totalAmount}</span>
+                <span>Status: ${status}</span><span>₹${order.totalAmount}</span>
               </div>
+              <p class="text-xs text-gray-600 mt-1">Address: ${order.deliveryAddress}</p>
+              ${cancelBtn}
             </div>
           `;
         });
       });
+    }
+
+    async function cancelOrder(orderId) {
+      if (!confirm("Kya aap waqai is order ko cancel karna chahte hain?")) return;
+
+      try {
+        await db.collection('orders').doc(orderId).update({
+          status: 'Cancelled'
+        });
+        alert("Order successfully cancelled!");
+      } catch (err) {
+        console.error("Cancel error:", err);
+        alert("Order cancel karne mein error aayi.");
+      }
     }
   </script>
 </body>
