@@ -8,6 +8,9 @@
   <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-firestore-compat.js"></script>
+  <!-- Leaflet CSS for Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
 <body class="bg-gray-100 min-h-screen text-gray-800">
 
@@ -63,8 +66,10 @@
       </div>
 
       <div class="bg-white p-5 rounded-lg shadow">
-        <h2 class="text-xl font-bold mb-3 border-b pb-2">📍 Live Order Status</h2>
-        <div id="live-orders" class="space-y-3"><p class="text-sm text-gray-500">Login to track your orders.</p></div>
+        <h2 class="text-xl font-bold mb-3 border-b pb-2">📍 Live Order Status & Tracking</h2>
+        <div id="live-orders" class="space-y-3 mb-4"><p class="text-sm text-gray-500">Login to track your orders.</p></div>
+        <!-- Map Container -->
+        <div id="map" class="h-48 w-full rounded-lg border hidden"></div>
       </div>
     </div>
   </div>
@@ -88,6 +93,8 @@
     let user = null;
     let cart = [];
     let currentVendor = null;
+    let map = null;
+    let marker = null;
 
     auth.onAuthStateChanged(async (firebaseUser) => {
       if (firebaseUser) {
@@ -129,6 +136,7 @@
       document.getElementById('vendor-reg-container').classList.add('hidden');
       document.getElementById('add-menu-container').classList.add('hidden');
       document.getElementById('live-orders').innerHTML = '<p class="text-sm text-gray-500">Login to track your orders.</p>';
+      document.getElementById('map').classList.add('hidden');
     }
 
     async function checkVendorStatus(uid) {
@@ -272,11 +280,18 @@
       if (!user) return;
       db.collection('orders').where('userId', '==', user.uid).onSnapshot(snapshot => {
         const container = document.getElementById('live-orders');
+        const mapDiv = document.getElementById('map');
         container.innerHTML = '';
+
         if (snapshot.empty) {
           container.innerHTML = `<p class="text-sm text-gray-500">No active orders found.</p>`;
+          mapDiv.classList.add('hidden');
           return;
         }
+
+        mapDiv.classList.remove('hidden');
+        initMap();
+
         snapshot.forEach(doc => {
           const order = doc.data();
           const orderId = doc.id;
@@ -298,6 +313,20 @@
           `;
         });
       });
+    }
+
+    function initMap() {
+      if (!map) {
+        // Default coordinates (Jaipur center)
+        map = L.map('map').setView([26.9124, 75.7873], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+        marker = L.marker([26.9124, 75.7873]).addTo(map).bindPopup('Delivery Location').openPopup();
+      } else {
+        setTimeout(() => { map.invalidateSize(); }, 300);
+      }
     }
 
     async function cancelOrder(orderId) {
