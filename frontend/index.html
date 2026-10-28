@@ -64,10 +64,19 @@
       <div class="bg-white p-5 rounded-lg shadow">
         <h2 class="text-xl font-bold mb-3 border-b pb-2">🛒 Your Cart</h2>
         <div id="cart-items" class="space-y-2 text-sm text-gray-600 mb-4"><p class="italic">Cart is empty</p></div>
+        
+        <!-- Checkout Form Fields -->
         <div class="space-y-2 mb-3">
           <input type="text" id="delivery-address" placeholder="Enter Delivery Address" class="w-full p-2 border rounded text-sm">
           <input type="text" id="phone-number" placeholder="Phone Number" class="w-full p-2 border rounded text-sm">
+          
+          <!-- Payment Method Dropdown -->
+          <select id="payment-method" class="w-full p-2 border rounded text-sm bg-white">
+            <option value="COD">Cash on Delivery (COD)</option>
+            <option value="Online">Online Payment (UPI / Card)</option>
+          </select>
         </div>
+
         <div class="flex justify-between font-bold text-lg mb-4"><span>Total:</span><span>₹<span id="cart-total">0</span></span></div>
         <button onclick="placeOrder()" class="w-full bg-orange-600 text-white py-2 rounded-lg font-bold hover:bg-orange-700 transition">Place Order</button>
       </div>
@@ -242,6 +251,7 @@
 
       const address = document.getElementById('delivery-address').value.trim();
       const phone = document.getElementById('phone-number').value.trim();
+      const paymentMethod = document.getElementById('payment-method').value;
 
       if (!address || !phone) {
         return alert("Kripya Delivery Address aur Phone Number bharein!");
@@ -261,13 +271,14 @@
             items: cart,
             totalAmount: cart.reduce((sum, item) => sum + item.price, 0),
             deliveryAddress: address,
-            phone: phone
+            phone: phone,
+            paymentMethod: paymentMethod
           })
         });
 
         const data = await res.json();
         if (data.success) {
-          alert("Order Successful! ID: " + data.orderId);
+          alert("Order Successful! Payment Mode: " + paymentMethod + " | ID: " + data.orderId);
           cart = [];
           renderCart();
           document.getElementById('delivery-address').value = '';
@@ -296,6 +307,7 @@
           const order = doc.data();
           const orderId = doc.id;
           const status = order.status || 'Placed';
+          const paymentMode = order.paymentMethod || 'COD';
 
           let cancelBtn = '';
           if (status === 'Pending' || status === 'Placed') {
@@ -308,6 +320,7 @@
                 <span>Status: ${status}</span><span>₹${order.totalAmount}</span>
               </div>
               <p class="text-xs text-gray-600 mt-1">Address: ${order.deliveryAddress || 'N/A'}</p>
+              <p class="text-xs text-gray-600">Payment: <b>${paymentMode}</b></p>
               ${cancelBtn}
             </div>
           `;
@@ -319,7 +332,6 @@
 
     function initMap() {
       if (!map) {
-        // Jaipur / Delivery Location coordinates
         map = L.map('map').setView([26.9124, 75.7873], 12);
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
           maxZoom: 19,
@@ -333,7 +345,6 @@
       setTimeout(() => { map.invalidateSize(); }, 500);
     }
 
-    // Auto load map on page load
     window.onload = function() {
       initMap();
     };
