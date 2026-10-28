@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cloud Eats - Food Ordering Web App</title>
+  <title>Cloud Eats - Multi-Vendor Food App</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.1.0/firebase-auth-compat.js"></script>
@@ -13,8 +13,8 @@
 
   <header class="bg-orange-600 text-white p-4 shadow-md sticky top-0 z-50">
     <div class="max-w-6xl mx-auto flex justify-between items-center">
-      <h1 class="text-2xl font-bold">🍔 CloudEats</h1>
-      <div id="auth-section">
+      <h1 class="text-2xl font-bold cursor-pointer" onclick="location.reload()">🍔 CloudEats Marketplace</h1>
+      <div id="auth-section" class="flex items-center space-x-3">
         <button onclick="login()" class="bg-white text-orange-600 font-semibold px-4 py-2 rounded-lg shadow hover:bg-orange-50 transition">
           Login with Google
         </button>
@@ -23,10 +23,32 @@
   </header>
 
   <div class="max-w-6xl mx-auto p-4 grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
-    <div class="md:col-span-2">
-      <h2 class="text-xl font-bold mb-4">📜 Delicious Menu</h2>
-      <div id="menu-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div class="p-4 bg-white rounded-lg shadow text-center text-gray-500">Loading Menu Items...</div>
+    <div class="md:col-span-2 space-y-6">
+      <!-- Vendor Registration Box (Only visible when logged in & not registered) -->
+      <div id="vendor-reg-container" class="bg-white p-5 rounded-lg shadow hidden">
+        <h2 class="text-lg font-bold mb-3 text-orange-600">🏪 Register Your Restaurant / Company</h2>
+        <div class="space-y-3">
+          <input type="text" id="restaurant-name" placeholder="Restaurant / Company Name" class="w-full p-2 border rounded">
+          <button onclick="registerAsVendor()" class="bg-green-600 text-white px-4 py-2 rounded font-bold hover:bg-green-700 transition">Register as Vendor</button>
+        </div>
+      </div>
+
+      <!-- Add Menu Item Box (Visible only if user is a registered vendor) -->
+      <div id="add-menu-container" class="bg-white p-5 rounded-lg shadow hidden">
+        <h2 class="text-lg font-bold mb-3 text-orange-600">➕ Add Food Product</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input type="text" id="food-name" placeholder="Item Name" class="p-2 border rounded">
+          <input type="number" id="food-price" placeholder="Price (₹)" class="p-2 border rounded">
+          <input type="text" id="food-image" placeholder="Image URL" class="p-2 border rounded">
+        </div>
+        <button onclick="addFoodItem()" class="mt-3 bg-orange-600 text-white px-4 py-2 rounded font-bold hover:bg-orange-700 transition">Add Item to Menu</button>
+      </div>
+
+      <div>
+        <h2 class="text-xl font-bold mb-4">📜 Available Food Items</h2>
+        <div id="menu-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="p-4 bg-white rounded-lg shadow text-center text-gray-500">Loading Menu Items...</div>
+        </div>
       </div>
     </div>
 
@@ -63,55 +85,123 @@
 
     let user = null;
     let cart = [];
+    let currentVendor = null;
+
+    auth.onAuthStateChanged(async (firebaseUser) => {
+      if (firebaseUser) {
+        user = firebaseUser;
+        updateAuthUI();
+        checkVendorStatus(user.uid);
+        listenLiveOrders();
+      } else {
+        user = null;
+        currentVendor = null;
+        resetAuthUI();
+      }
+    });
 
     function login() {
       const provider = new firebase.auth.GoogleAuthProvider();
-      auth.signInWithPopup(provider).then(res => {
-        user = res.user;
-        updateAuthUI();
-        listenLiveOrders();
-      }).catch(err => console.error("Login error:", err));
+      auth.signInWithPopup(provider).catch(err => console.error("Login error:", err));
     }
 
     function logoutUser() {
-      auth.signOut().then(() => {
-        user = null;
-        document.getElementById('auth-section').innerHTML = `
-          <button onclick="login()" class="bg-white text-orange-600 font-semibold px-4 py-2 rounded-lg shadow hover:bg-orange-50 transition">
-            Login with Google
-          </button>
-        `;
-        document.getElementById('live-orders').innerHTML = '<p class="text-sm text-gray-500">Login to track your orders.</p>';
-      }).catch(err => console.error("Logout error:", err));
+      auth.signOut().catch(err => console.error("Logout error:", err));
     }
 
     function updateAuthUI() {
       if (user) {
         document.getElementById('auth-section').innerHTML = `
-          <span class="font-medium mr-3 text-white">Hi, ${user.displayName.split(' ')[0]}</span>
+          <span class="font-medium mr-2 text-white">Hi, ${user.displayName.split(' ')[0]}</span>
           <button onclick="logoutUser()" class="bg-orange-800 text-xs text-white px-3 py-1 rounded hover:bg-orange-900 transition">Logout</button>
         `;
       }
     }
 
+    function resetAuthUI() {
+      document.getElementById('auth-section').innerHTML = `
+        <button onclick="login()" class="bg-white text-orange-600 font-semibold px-4 py-2 rounded-lg shadow hover:bg-orange-50 transition">
+          Login with Google
+        </button>
+      `;
+      document.getElementById('vendor-reg-container').classList.add('hidden');
+      document.getElementById('add-menu-container').classList.add('hidden');
+      document.getElementById('live-orders').innerHTML = '<p class="text-sm text-gray-500">Login to track your orders.</p>';
+    }
+
+    async function checkVendorStatus(uid) {
+      const doc = await db.collection('vendors').doc(uid).get();
+      if (doc.exists) {
+        currentVendor = doc.data();
+        document.getElementById('vendor-reg-container').classList.add('hidden');
+        document.getElementById('add-menu-container').classList.remove('hidden');
+      } else {
+        document.getElementById('vendor-reg-container').classList.remove('hidden');
+        document.getElementById('add-menu-container').classList.add('hidden');
+      }
+    }
+
+    async function registerAsVendor() {
+      const name = document.getElementById('restaurant-name').value.trim();
+      if (!name) return alert("Please enter a restaurant name!");
+
+      await db.collection('vendors').doc(user.uid).set({
+        uid: user.uid,
+        restaurantName: name,
+        ownerEmail: user.email,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+
+      alert("Restaurant Registered Successfully!");
+      checkVendorStatus(user.uid);
+    }
+
+    async function addFoodItem() {
+      const name = document.getElementById('food-name').value.trim();
+      const price = parseFloat(document.getElementById('food-price').value);
+      const imageUrl = document.getElementById('food-image').value.trim();
+
+      if (!name || isNaN(price)) return alert("Please enter valid item details!");
+
+      await db.collection('menu').add({
+        name,
+        price,
+        imageUrl: imageUrl || 'https://via.placeholder.com/150',
+        vendorId: user.uid,
+        restaurantName: currentVendor.restaurantName
+      });
+
+      alert("Item added to menu successfully!");
+      document.getElementById('food-name').value = '';
+      document.getElementById('food-price').value = '';
+      document.getElementById('food-image').value = '';
+    }
+
     db.collection('menu').onSnapshot(snapshot => {
       const container = document.getElementById('menu-container');
       container.innerHTML = '';
+      if (snapshot.empty) {
+        container.innerHTML = `<p class="text-gray-500">No food items available yet.</p>`;
+        return;
+      }
       snapshot.forEach(doc => {
         const item = doc.data();
         container.innerHTML += `
           <div class="bg-white p-4 rounded-lg shadow flex flex-col justify-between">
-            <img src="${item.imageUrl || 'https://via.placeholder.com/150'}" class="h-36 w-full object-cover rounded mb-3">
-            <h3 class="font-bold text-lg">${item.name}</h3>
-            <p class="text-orange-600 font-bold mb-3">₹${item.price}</p>
-            <button onclick="addToCart('${item.name}', ${item.price})" class="bg-gray-900 text-white py-1 rounded hover:bg-orange-600 transition">+ Add to Cart</button>
+            <img src="${item.imageUrl}" class="h-36 w-full object-cover rounded mb-3">
+            <div>
+              <h3 class="font-bold text-lg">${item.name}</h3>
+              <p class="text-xs text-gray-500 mb-1">By: ${item.restaurantName || 'CloudEats'}</p>
+              <p class="text-orange-600 font-bold mb-3">₹${item.price}</p>
+            </div>
+            <button onclick="addToCart('${doc.id}', '${item.name}', ${item.price}, '${item.vendorId}')" class="bg-gray-900 text-white py-1 rounded hover:bg-orange-600 transition">+ Add to Cart</button>
           </div>
         `;
       });
     });
 
-    function addToCart(name, price) {
-      cart.push({ name, price });
+    function addToCart(id, name, price, vendorId) {
+      cart.push({ id, name, price, vendorId });
       renderCart();
     }
 
@@ -134,12 +224,15 @@
       if (!user) return alert("Pehle login karein!");
       if (cart.length === 0) return alert("Cart khali hai!");
 
+      const vendorId = cart[0].vendorId;
+
       try {
         const res = await fetch(`${BACKEND_URL}/api/orders/create`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.uid,
+            vendorId: vendorId,
             items: cart,
             totalAmount: cart.reduce((sum, item) => sum + item.price, 0),
             deliveryAddress: "Jaipur, Rajasthan"
